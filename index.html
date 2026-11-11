@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title data-i18n-title>木盘迷宫</title>
+<style>
+  :root {
+    --cream: #f4eadb;
+    --dim: rgba(244, 234, 219, 0.62);
+    --brass: #d9b46c;
+    --serif: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", Georgia, serif;
+    --sans: -apple-system, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #070605; overflow: hidden; }
+  body { color: var(--cream); font-family: var(--sans); -webkit-font-smoothing: antialiased; user-select: none; -webkit-user-select: none; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+
+  .layer { position: fixed; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.7s ease; }
+  body[data-state="loading"] #loading,
+  body[data-state="title"] #title,
+  body[data-state="play"] #hud,
+  body[data-state="won"] #hud,
+  body[data-state="won"] #result { opacity: 1; pointer-events: auto; }
+  body[data-state="play"] #hud, body[data-state="won"] #hud { pointer-events: none; }
+  body[data-state="play"] { cursor: none; }
+
+  #loading { display: grid; place-items: center; font-family: var(--serif); letter-spacing: 0.4em; color: var(--dim); font-size: 15px; padding: 16px; text-align: center; }
+
+  /* 标题 */
+  #title { cursor: pointer; background: linear-gradient(90deg, rgba(5, 4, 3, 0.78) 0%, rgba(5, 4, 3, 0.35) 38%, rgba(5, 4, 3, 0) 62%); }
+  .title-block { position: absolute; left: clamp(20px, 7vw, 120px); top: 50%; transform: translateY(-54%); max-width: min(520px, calc(100vw - 40px)); }
+  .eyebrow { font-size: 12px; letter-spacing: 0.5em; color: var(--brass); margin: 0 0 22px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(52px, 8.4vw, 118px); line-height: 1.04; letter-spacing: 0.06em; margin: 0; text-shadow: 0 2px 30px rgba(0, 0, 0, 0.6); }
+  .lede { font-family: var(--serif); font-size: clamp(15px, 1.5vw, 19px); line-height: 1.9; color: var(--dim); margin: 26px 0 34px; text-wrap: pretty; }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 40px; }
+  .chip { font-family: var(--serif); font-size: 14px; letter-spacing: 0.12em; padding: 9px 18px; border: 1px solid rgba(217, 180, 108, 0.35); border-radius: 999px; color: var(--dim); transition: all 0.25s ease; }
+  .chip:hover { color: var(--cream); border-color: var(--brass); }
+  .chip.on { color: #1a1206; background: var(--brass); border-color: var(--brass); }
+  .begin { display: inline-flex; align-items: center; gap: 14px; font-family: var(--serif); font-size: 17px; letter-spacing: 0.32em; color: var(--cream); animation: breathe 2.6s ease-in-out infinite; }
+  .begin::before { content: ""; width: 44px; height: 1px; background: var(--brass); }
+  @keyframes breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+  .keys { position: absolute; left: clamp(20px, 7vw, 120px); bottom: clamp(18px, 4vh, 44px); font-size: 12px; letter-spacing: 0.14em; color: rgba(244, 234, 219, 0.42); line-height: 1.9; }
+  .credit { position: absolute; right: clamp(16px, 3vw, 40px); bottom: clamp(18px, 4vh, 44px); font-size: 11px; letter-spacing: 0.12em; color: rgba(244, 234, 219, 0.3); text-align: right; }
+
+  /* 游戏中 */
+  .hud-top { position: absolute; top: clamp(14px, 3vh, 30px); left: 0; right: 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; padding: 0 clamp(16px, 3vw, 40px); gap: 12px; }
+  #level-name { font-family: var(--serif); font-size: 15px; letter-spacing: 0.22em; color: var(--dim); }
+  #timer { font-family: var(--serif); font-variant-numeric: tabular-nums; font-size: clamp(26px, 3.2vw, 40px); letter-spacing: 0.08em; text-shadow: 0 1px 18px rgba(0, 0, 0, 0.7); }
+  .right { justify-self: end; display: flex; gap: 22px; align-items: baseline; font-size: 13px; letter-spacing: 0.16em; color: var(--dim); }
+  .right b { font-family: var(--serif); font-weight: 600; font-size: 20px; color: var(--cream); font-variant-numeric: tabular-nums; margin-left: 8px; }
+  .tool { pointer-events: auto; font-size: 12px; letter-spacing: 0.16em; color: var(--dim); cursor: pointer; white-space: nowrap; }
+  .tool:hover { color: var(--cream); }
+  .level-gauge { position: absolute; left: clamp(16px, 3vw, 40px); bottom: clamp(16px, 3.4vh, 34px); display: flex; align-items: center; gap: 16px; }
+  .vial { width: 54px; height: 54px; border-radius: 50%; border: 1px solid rgba(217, 180, 108, 0.55); background: radial-gradient(circle at 50% 40%, rgba(217, 180, 108, 0.16), rgba(0, 0, 0, 0.35)); position: relative; box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.6); }
+  .vial::before { content: ""; position: absolute; inset: 17px; border-radius: 50%; border: 1px solid rgba(244, 234, 219, 0.28); }
+  #bubble { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8e6, var(--brass) 70%); box-shadow: 0 0 10px rgba(217, 180, 108, 0.6); }
+  .hint { font-size: 11px; letter-spacing: 0.18em; line-height: 1.9; color: rgba(244, 234, 219, 0.4); }
+
+  #toast { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); font-family: var(--serif); font-size: 14px; letter-spacing: 0.24em; padding: 10px 22px; border-radius: 999px; border: 1px solid rgba(217, 180, 108, 0.35); background: rgba(16, 12, 8, 0.78); opacity: 0; transition: opacity 0.35s ease; pointer-events: none; white-space: nowrap; }
+  #toast.on { opacity: 1; }
+
+  /* 通关 */
+  #result { display: grid; place-items: center; background: radial-gradient(ellipse at center, rgba(5, 4, 3, 0.5), rgba(5, 4, 3, 0.82)); padding: 16px; }
+  .card { width: min(420px, 100%); padding: 40px 36px 34px; text-align: center; border: 1px solid rgba(217, 180, 108, 0.3); border-radius: 6px; background: rgba(16, 12, 8, 0.72); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); }
+  .card h2 { font-family: var(--serif); font-weight: 600; font-size: 44px; letter-spacing: 0.3em; margin: 0 0 6px 0.3em; }
+  .card .sub { font-size: 12px; letter-spacing: 0.4em; color: var(--brass); margin: 0 0 30px; min-height: 1.2em; }
+  .rows { display: grid; gap: 14px; margin: 0 0 34px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; letter-spacing: 0.2em; color: var(--dim); border-bottom: 1px solid rgba(244, 234, 219, 0.1); padding-bottom: 12px; }
+  .row span:last-child { font-family: var(--serif); font-size: 22px; letter-spacing: 0.06em; color: var(--cream); font-variant-numeric: tabular-nums; }
+  .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { font-family: var(--serif); font-size: 15px; letter-spacing: 0.24em; padding: 12px 26px; border-radius: 999px; border: 1px solid rgba(217, 180, 108, 0.45); transition: all 0.2s ease; }
+  .btn:hover { border-color: var(--brass); }
+  .btn.primary { background: var(--brass); color: #1a1206; border-color: var(--brass); }
+  .btn.primary:hover { background: #e8c680; }
+  .for-touch { display: none; }
+  @media (pointer: coarse) { .for-mouse { display: none; } .for-touch { display: inline; } }
+  @media (max-width: 640px) {
+    .keys, .credit { display: none; }
+    #level-name { font-size: 12px; }
+    .right { gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+    .hud-top { grid-template-columns: auto 1fr; }
+    #timer { grid-row: 2; grid-column: 1 / -1; justify-self: center; }
+  }
+  @media (prefers-reduced-motion: reduce) { .begin { animation: none; } }
+
+  /* ---- 한글화: 언어 전환 / 크레딧 / 한글 서체 ---- */
+  .keys, .credit { bottom: calc(clamp(18px, 4vh, 44px) + 18px); }
+  #ko-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding: 0 clamp(12px, 2vw, 24px) 8px; pointer-events: none; visibility: hidden; opacity: 0; transition: opacity 0.7s ease, visibility 0s linear 0.7s; font-family: var(--sans); }
+  body[data-state="loading"] #ko-bar, body[data-state="title"] #ko-bar, body[data-state="won"] #ko-bar { visibility: visible; opacity: 1; transition: opacity 0.7s ease; }
+  #ko-bar .ko-credit { font-size: 11px; line-height: 1.6; color: rgba(244, 234, 219, 0.5); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
+  #ko-bar a { color: rgba(217, 180, 108, 0.85); text-decoration: none; pointer-events: auto; }
+  #ko-bar a:hover, #ko-bar a:focus-visible { color: var(--cream); text-decoration: underline; }
+  #ko-bar .lang-sw { display: flex; gap: 2px; flex: none; pointer-events: auto; border: 1px solid rgba(217, 180, 108, 0.35); border-radius: 999px; background: rgba(16, 12, 8, 0.6); padding: 2px; }
+  #ko-bar .lang-sw button { font-size: 12px; line-height: 1; padding: 6px 11px; border-radius: 999px; color: var(--dim); }
+  #ko-bar .lang-sw button:hover { color: var(--cream); }
+  #ko-bar .lang-sw button[aria-pressed="true"] { background: var(--brass); color: #1a1206; cursor: default; }
+  #ko-bar .lang-sw button:focus-visible { outline: 2px solid var(--cream); outline-offset: 1px; }
+  html[lang="ko"] { --serif: "Noto Serif KR", "Nanum Myeongjo", "Batang", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; --sans: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+  html[lang="ko"] body { word-break: keep-all; overflow-wrap: break-word; }
+  html[lang="ko"] #loading { letter-spacing: 0.08em; }
+  html[lang="ko"] h1 { letter-spacing: 0.02em; }
+  html[lang="ko"] .lede { line-height: 1.8; letter-spacing: 0; }
+  html[lang="ko"] .chip { letter-spacing: 0.04em; }
+  html[lang="ko"] .begin { letter-spacing: 0.1em; }
+  html[lang="ko"] .keys { letter-spacing: 0.02em; }
+  html[lang="ko"] .credit { letter-spacing: 0.02em; }
+  html[lang="ko"] #level-name { letter-spacing: 0.05em; }
+  html[lang="ko"] .right, html[lang="ko"] .tool { letter-spacing: 0.03em; }
+  html[lang="ko"] .hint { letter-spacing: 0.02em; }
+  html[lang="ko"] #toast { letter-spacing: 0.03em; }
+  html[lang="ko"] .card h2 { letter-spacing: 0.12em; margin-left: 0.12em; }
+  html[lang="ko"] .card .sub { letter-spacing: 0.2em; }
+  html[lang="ko"] .row { letter-spacing: 0.04em; }
+  html[lang="ko"] .btn { letter-spacing: 0.06em; }
+  @media (max-width: 640px) { #ko-bar { flex-direction: column-reverse; align-items: flex-end; gap: 6px; } #ko-bar .ko-credit { align-self: stretch; text-align: right; } }
+</style>
+</head>
+<body data-state="loading">
+<canvas id="scene"></canvas>
+
+<div id="loading" class="layer" data-i18n="loading">正在摆放木盘</div>
+
+<div id="title" class="layer">
+  <div class="title-block">
+    <p class="eyebrow">TILT · LABYRINTH</p>
+    <h1 data-i18n="h1">木盘迷宫</h1>
+    <p class="lede" data-i18n-html="lede">一只胡桃木盒，一块橡木盘，一颗钢珠。<br>倾斜盘面，绕开每一个洞，把它送进黄铜环。</p>
+    <div class="chips">
+      <button class="chip" data-level="0" data-i18n="chip0">第一局</button>
+      <button class="chip" data-level="1" data-i18n="chip1">第二局</button>
+      <button class="chip" data-level="2" data-i18n="chip2">第三局</button>
+    </div>
+    <div class="begin" data-i18n="begin">点击开始</div>
+  </div>
+  <div class="keys" data-i18n-html="keys">移动鼠标 / 方向键 / 触屏拖动 — 倾斜木盘<br>R 重来　·　1 2 3 换局　·　M 静音　·　Q 画质　·　Esc 返回</div>
+  <div class="credit" data-i18n="credit">贴图与环境光：Poly Haven（CC0）</div>
+</div>
+
+<div id="hud" class="layer">
+  <div class="hud-top">
+    <div id="level-name"></div>
+    <div id="timer">00:00.0</div>
+    <div class="right"><span><span data-i18n="falls">掉洞</span><b id="falls">0</b></span><button id="again" class="tool" data-i18n="again">重来</button><button id="back" class="tool" data-i18n="back">返回</button><button id="mute" class="tool" data-i18n="muteOn">声音 开</button></div>
+  </div>
+  <div class="level-gauge">
+    <div class="vial"><div id="bubble"></div></div>
+    <div class="hint"><span class="for-mouse" data-i18n-html="hintMouse">移动鼠标倾斜木盘，气泡回到中心即为水平<br>R 重来　·　Esc 返回　·　M 静音</span><span class="for-touch" data-i18n-html="hintTouch">按住屏幕拖动，倾斜木盘<br>气泡回到中心即为水平</span></div>
+  </div>
+</div>
+
+<div id="result" class="layer">
+  <div class="card">
+    <h2 data-i18n="win">通关</h2>
+    <p class="sub"><span id="r-new" hidden data-i18n="newRec">新 纪 录</span></p>
+    <div class="rows">
+      <div class="row"><span data-i18n="rTime">用时</span><span id="r-time">—</span></div>
+      <div class="row"><span data-i18n="falls">掉洞</span><span id="r-falls">—</span></div>
+      <div class="row"><span data-i18n="rBest">最佳</span><span id="r-best">—</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="retry" data-i18n="retry">再来一次</button>
+      <button class="btn primary" id="next" data-i18n="next">下一局</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="ko-bar">
+  <div class="ko-credit" id="ko-credit"></div>
+  <div class="lang-sw" role="group" aria-label="Language / 언어"><button type="button" data-lang="ko" lang="ko">한국어</button><button type="button" data-lang="zh" lang="zh">中文</button></div>
+</div>
+
+<script>
+/* 한글화: 언어 선택(?lang= > localStorage > navigator.language) 및 번역 사전. game.js보다 먼저 실행됩니다. */
+(function () {
+  var D = {
+ "zh": {
+  "title": "木盘迷宫",
+  "loading": "正在摆放木盘",
+  "h1": "木盘迷宫",
+  "lede": "一只胡桃木盒，一块橡木盘，一颗钢珠。<br>倾斜盘面，绕开每一个洞，把它送进黄铜环。",
+  "chip0": "第一局",
+  "chip1": "第二局",
+  "chip2": "第三局",
+  "begin": "点击开始",
+  "keys": "移动鼠标 / 方向键 / 触屏拖动 — 倾斜木盘<br>R 重来　·　1 2 3 换局　·　M 静音　·　Q 画质　·　Esc 返回",
+  "credit": "贴图与环境光：Poly Haven（CC0）",
+  "falls": "掉洞",
+  "again": "重来",
+  "back": "返回",
+  "muteOn": "声音 开",
+  "muteOff": "声音 关",
+  "hintMouse": "移动鼠标倾斜木盘，气泡回到中心即为水平<br>R 重来　·　Esc 返回　·　M 静音",
+  "hintTouch": "按住屏幕拖动，倾斜木盘<br>气泡回到中心即为水平",
+  "win": "通关",
+  "newRec": "新 纪 录",
+  "rTime": "用时",
+  "rBest": "最佳",
+  "retry": "再来一次",
+  "next": "下一局",
+  "backFirst": "回到第一局",
+  "fallsUnit": " 次",
+  "loadFail": "载入失败：",
+  "lv0": "第一局 · 初试",
+  "lv1": "第二局 · 屏息",
+  "lv2": "第三局 · 如履薄冰",
+  "plaque": [
+   "迷宫 · 第一局",
+   "迷宫 · 第二局",
+   "迷宫 · 第三局"
+  ],
+  "plaqueFont": "600 88px \"Songti SC\", \"STSong\", \"Noto Serif SC\", Georgia, serif",
+  "qHigh": "画质：高（更清晰，更吃显卡）",
+  "qStd": "画质：标准",
+  "footer": "原作：<a href=\"https://github.com/majiayu000\" target=\"_blank\" rel=\"noopener\">majiayu000</a>（MIT）· 贴图：<a href=\"https://polyhaven.com/\" target=\"_blank\" rel=\"noopener\">Poly Haven</a>（CC0）· 韩文本地化：<a href=\"https://github.com/sigco3111\" target=\"_blank\" rel=\"noopener\">sigco3111</a> · <a href=\"https://github.com/majiayu000/blog/tree/main/src/posts/tilt-labyrinth/play\" target=\"_blank\" rel=\"noopener\">源仓库</a>"
+ },
+ "ko": {
+  "title": "나무판 미로 · Tilt Labyrinth",
+  "loading": "나무판을 올려놓는 중",
+  "h1": "나무판 미로",
+  "lede": "호두나무 상자 하나, 참나무 판 하나, 강철 구슬 하나.<br>판을 기울여 모든 구멍을 피해 구슬을 황동 고리까지 굴려 보내세요.",
+  "chip0": "1단계",
+  "chip1": "2단계",
+  "chip2": "3단계",
+  "begin": "클릭하여 시작",
+  "keys": "마우스 이동 / 방향키 / 터치 드래그 — 나무판 기울이기<br>R 다시 시작　·　1 2 3 단계 선택　·　M 음소거　·　Q 화질　·　Esc 돌아가기",
+  "credit": "텍스처·환경광: Poly Haven (CC0)",
+  "falls": "추락",
+  "again": "다시 시작",
+  "back": "돌아가기",
+  "muteOn": "소리 켜짐",
+  "muteOff": "소리 꺼짐",
+  "hintMouse": "마우스를 움직여 나무판을 기울이세요. 기포가 중앙에 오면 수평입니다<br>R 다시 시작　·　Esc 돌아가기　·　M 음소거",
+  "hintTouch": "화면을 누른 채 드래그해 나무판을 기울이세요<br>기포가 중앙에 오면 수평입니다",
+  "win": "클리어",
+  "newRec": "신기록",
+  "rTime": "소요 시간",
+  "rBest": "최고 기록",
+  "retry": "한 번 더",
+  "next": "다음 단계",
+  "backFirst": "1단계로 돌아가기",
+  "fallsUnit": "회",
+  "loadFail": "불러오기 실패: ",
+  "lv0": "1단계 · 첫걸음",
+  "lv1": "2단계 · 숨죽이며",
+  "lv2": "3단계 · 살얼음판",
+  "plaque": [
+   "미로 · 1단계",
+   "미로 · 2단계",
+   "미로 · 3단계"
+  ],
+  "plaqueFont": "600 88px \"Noto Serif KR\", \"Noto Sans KR\", \"Malgun Gothic\", \"Apple SD Gothic Neo\", \"Nanum Myeongjo\", \"Batang\", sans-serif",
+  "qHigh": "화질: 높음 (더 선명하지만 GPU 부하 증가)",
+  "qStd": "화질: 표준",
+  "footer": "원작: <a href=\"https://github.com/majiayu000\" target=\"_blank\" rel=\"noopener\">majiayu000</a> (MIT) · 텍스처: <a href=\"https://polyhaven.com/\" target=\"_blank\" rel=\"noopener\">Poly Haven</a> (CC0) · 한글화: <a href=\"https://github.com/sigco3111\" target=\"_blank\" rel=\"noopener\">sigco3111</a> · <a href=\"https://github.com/majiayu000/blog/tree/main/src/posts/tilt-labyrinth/play\" target=\"_blank\" rel=\"noopener\">원본 저장소</a>"
+ }
+};
+  var KEY = "tilt-labyrinth-ko.lang";
+  function norm(v) { v = String(v || "").toLowerCase(); return /^ko/.test(v) ? "ko" : /^(zh|cn)/.test(v) ? "zh" : null; }
+  var lang = null, q = null;
+  try { q = norm(new URLSearchParams(location.search).get("lang")); } catch (e) {}
+  try { if (q) localStorage.setItem(KEY, q); } catch (e) {}
+  lang = q;
+  if (!lang) { try { lang = norm(localStorage.getItem(KEY)); } catch (e) {} }
+  if (!lang) lang = norm(navigator.language || (navigator.languages && navigator.languages[0])) === "ko" ? "ko" : "zh";
+  var T = D[lang];
+  window.__lang = lang;
+  window.__tl = function (k, i) { var v = T[k]; return v == null ? D.zh[k] : (Array.isArray(v) ? v[i] : v); };
+  document.documentElement.lang = lang === "ko" ? "ko" : "zh-CN";
+  document.title = T.title;
+  function apply() {
+    var n, i;
+    n = document.querySelectorAll("[data-i18n]");
+    for (i = 0; i < n.length; i++) n[i].textContent = T[n[i].getAttribute("data-i18n")];
+    n = document.querySelectorAll("[data-i18n-html]");
+    for (i = 0; i < n.length; i++) n[i].innerHTML = T[n[i].getAttribute("data-i18n-html")];
+    document.getElementById("ko-credit").innerHTML = T.footer;
+    n = document.querySelectorAll("#ko-bar [data-lang]");
+    for (i = 0; i < n.length; i++) {
+      n[i].setAttribute("aria-pressed", n[i].getAttribute("data-lang") === lang ? "true" : "false");
+      n[i].addEventListener("click", function () {
+        var l = this.getAttribute("data-lang");
+        if (l === lang) return;
+        try { localStorage.setItem(KEY, l); } catch (e) {}
+        var u = new URL(location.href); u.searchParams.delete("lang"); location.href = u.toString();
+      });
+    }
+    document.getElementById("ko-bar").addEventListener("keydown", function (e) { e.stopPropagation(); });
+  }
+  apply();
+})();
+</script>
+<script src="dist/game.js"></script>
+</body>
+</html>
