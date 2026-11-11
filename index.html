@@ -101,7 +101,11 @@
   html[lang="ko"] { --serif: "Noto Serif KR", "Nanum Myeongjo", "Batang", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; --sans: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
   html[lang="ko"] body { word-break: keep-all; overflow-wrap: break-word; }
   html[lang="ko"] #loading { letter-spacing: 0.08em; }
-  html[lang="ko"] h1 { letter-spacing: 0.02em; }
+  html[lang="ko"] .title-block { max-width: min(600px, calc(100vw - 40px)); }
+  html[lang="ko"] h1 { letter-spacing: 0.02em; font-size: clamp(44px, 6.2vw, 88px); }
+  html[lang="ko"] .eyebrow { margin-bottom: 16px; }
+  html[lang="ko"] .lede { margin: 20px 0 26px; }
+  html[lang="ko"] .chips { margin-bottom: 30px; }
   html[lang="ko"] .lede { line-height: 1.8; letter-spacing: 0; }
   html[lang="ko"] .chip { letter-spacing: 0.04em; }
   html[lang="ko"] .begin { letter-spacing: 0.1em; }
